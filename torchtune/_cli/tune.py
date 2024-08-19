@@ -6,6 +6,12 @@
 
 import argparse
 
+# debug - start
+import sys
+
+sys.path.insert(0, '/home/ubuntu/lezhang.thu/biology-research/torchtune')
+# debug - end
+
 from torchtune._cli.cp import Copy
 from torchtune._cli.download import Download
 from torchtune._cli.ls import List

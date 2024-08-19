@@ -286,3 +286,37 @@ def lora_qwen2_1_5b(
         lora_dropout=lora_dropout,
         quantize_base=quantize_base,
     )
+
+
+
+def qwen2_x() -> TiedEmbeddingTransformerDecoder:
+    """
+    Builder for creating a Qwen2 model initialized w/ the default 0.5B parameter values
+    from https://huggingface.co/Qwen/Qwen2-0.5B-Instruct
+
+    Returns:
+        TiedEmbeddingTransformerDecoder: Instantiation of Qwen2 0.5B model
+
+    Note:
+        Qwen2 0.5B and Qwen2 1.5B model builders will enable `tie_word_embeddings` by default
+        and returns an instance of `TiedEmbeddingTransformerDecoder`.
+    """
+    return qwen2(
+        #vocab_size=151936,
+        # ACGT_ACGT 16 + ?_? 1 + [MASK] + [CLS]
+        vocab_size=17 + 1 + 1,
+        #num_layers=24,
+        num_layers=12,
+        num_heads=14,
+        num_kv_heads=2,
+        #embed_dim=896,
+        embed_dim=196,
+        #intermediate_dim=4864,
+        intermediate_dim=1024,
+        #max_seq_len=32768,
+        max_seq_len=83898 + 1,
+        attn_dropout=0.0,
+        norm_eps=1e-06,
+        rope_base=1000000.0,
+        tie_word_embeddings=True,
+    )

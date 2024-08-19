@@ -14,6 +14,10 @@ from torchtune.datasets._sft import SFTDataset
 from torchtune.modules.tokenizers import ModelTokenizer
 from torchtune.modules.transforms import Transform
 
+# debug
+x = ["hello"] * int(8e4)
+y = " ".join(x)
+
 
 class AlpacaToMessages(Transform):
     """
@@ -68,13 +72,18 @@ class AlpacaToMessages(Transform):
         messages = [
             Message(
                 role="user",
-                content=prompt,
-                masked=not self.train_on_input,
+                #content=prompt,
+                content=y,
+                # debug
+                #masked=not self.train_on_input,
+                masked=False,
                 eot=True,
             ),
             Message(
                 role="assistant",
-                content=sample[key_output],
+                # debug
+                #content=sample[key_output],
+                content="hello",
                 masked=False,
                 eot=True,
             ),
@@ -156,7 +165,9 @@ def alpaca_dataset(
     return ds
 
 
-alpaca_cleaned_dataset = partial(alpaca_dataset, source="yahma/alpaca-cleaned")
+# debug
+#alpaca_cleaned_dataset = partial(alpaca_dataset, source="yahma/alpaca-cleaned")
+alpaca_cleaned_dataset = partial(alpaca_dataset, source="/home/ubuntu/lezhang.thu/llama3/torchtune/alpaca-cleaned")
 alpaca_cleaned_dataset.__doc__ = """
 Builder for a variant of Alpaca-style datasets with the cleaned version of the
 original Alpaca dataset, `yahma/alpaca-cleaned <https://huggingface.co/datasets/yahma/alpaca-cleaned>`_.

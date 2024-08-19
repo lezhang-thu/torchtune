@@ -11,6 +11,8 @@ from ._model_builders import (
     lora_qwen2_1_5b,
     lora_qwen2_7b,
     qwen2_0_5b,
+    # debug
+    qwen2_x,
     qwen2_1_5b,
     qwen2_7b,
     qwen2_tokenizer,

@@ -291,6 +291,9 @@ class Llama3Tokenizer(ModelTokenizer, Transform):
         """
         messages = sample.pop("messages")
         tokens, mask = self.tokenize_messages(messages)
+        # debug
+        for idx, _ in enumerate(tokens):
+            tokens[idx] = 10
         sample["tokens"] = tokens
         sample["mask"] = mask
         return sample
