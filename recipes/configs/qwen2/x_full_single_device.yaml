@@ -17,15 +17,13 @@
 
 # Tokenizer
 tokenizer:
-#  _component_: torchtune.models.qwen2.qwen2_tokenizer
-  _component_: torchtune.models.llama3.llama3_tokenizer
-#  path: /tmp/Qwen2-0.5B-Instruct/vocab.json
-  path: /home/ubuntu/lezhang.thu/llama3/Meta-Llama-3-8B/tokenizer.model
-#  merges_file: /tmp/Qwen2-0.5B-Instruct/merges.txt
+  _component_: torchtune.models.qwen2.x_qwen2_tokenizer
 
 # Dataset
 dataset:
-  _component_: torchtune.datasets.alpaca_cleaned_dataset
+  _component_: torchtune.datasets.bio_dataset
+test_dataset:
+  _component_: torchtune.datasets.test_bio_dataset
 seed: null
 shuffle: True
 
@@ -35,10 +33,6 @@ model:
 
 checkpointer:
   _component_: torchtune.utils.FullModelHFCheckpointer
-  #checkpoint_dir: /tmp/Qwen2-0.5B-Instruct
-  #checkpoint_files: [
-  #  model.safetensors
-  #]
   recipe_checkpoint: null
   output_dir: /tmp/Qwen2-0.5B-Instruct-finetune
   model_type: QWEN2
@@ -48,10 +42,12 @@ resume_from_checkpoint: False
 # debug
 #batch_size: 2
 batch_size: 1
-epochs: 1
+#epochs: 1
+epochs: 100 
 optimizer:
   _component_: torch.optim.AdamW
-  lr: 2e-5
+  #lr: 2e-5
+  lr: 1e-4
 
 loss:
   _component_: torch.nn.CrossEntropyLoss
@@ -65,7 +61,8 @@ compile: False
 device: cuda
 
 # Memory management
-enable_activation_checkpointing: True
+#enable_activation_checkpointing: True
+enable_activation_checkpointing: False 
 
 # Reduced precision
 dtype: bf16

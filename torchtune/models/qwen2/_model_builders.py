@@ -7,6 +7,7 @@ from typing import List, Optional
 
 from torchtune.models.qwen2._component_builders import qwen2, lora_qwen2
 from torchtune.models.qwen2._tokenizer import Qwen2Tokenizer
+from torchtune.models.qwen2._x_tokenizer import x_Qwen2Tokenizer
 from torchtune.modules import TransformerDecoder, TiedEmbeddingTransformerDecoder
 from torchtune.modules.peft import LORA_ATTN_MODULES
 from torchtune.modules.tokenizers import parse_hf_tokenizer_json
@@ -94,6 +95,10 @@ def qwen2_1_5b() -> TiedEmbeddingTransformerDecoder:
         rope_base=1000000.0,
         tie_word_embeddings=True,
     )
+
+
+def x_qwen2_tokenizer(max_seq_len: Optional[int] = None,) -> x_Qwen2Tokenizer:
+    return x_Qwen2Tokenizer(max_seq_len=max_seq_len)
 
 
 def qwen2_tokenizer(
@@ -303,16 +308,16 @@ def qwen2_x() -> TiedEmbeddingTransformerDecoder:
     """
     return qwen2(
         #vocab_size=151936,
-        # ACGT_ACGT 16 + ?_? 1 + [MASK] + [CLS]
-        vocab_size=17 + 1 + 1,
+        # ACGT_ACGT 16 + ['?_?', 'D_I', 'I_I', 'D_D'] 4 + [MASK] 1 + [CLS] 1
+        vocab_size=16 + 4 + 1 + 1,
         #num_layers=24,
-        num_layers=12,
+        num_layers=1,
         num_heads=14,
         num_kv_heads=2,
-        #embed_dim=896,
-        embed_dim=196,
-        #intermediate_dim=4864,
-        intermediate_dim=1024,
+        embed_dim=896,
+        #embed_dim=196,
+        intermediate_dim=4864,
+        #intermediate_dim=1024,
         #max_seq_len=32768,
         max_seq_len=83898 + 1,
         attn_dropout=0.0,

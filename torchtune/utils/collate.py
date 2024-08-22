@@ -68,4 +68,12 @@ def padded_collate(
             (0, labels_seq_len - input_ids_seq_len),
             value=padding_idx,
         )
-    return {"tokens": input_ids.long(), "labels": labels.long()}
+    # debug
+    cls_label = torch.as_tensor([x["cls_label"] for x in batch])
+    gt = torch.as_tensor([x["gt"] for x in batch])
+    return {
+        "tokens": input_ids.long(),
+        "labels": labels.long(),
+        "cls_label": cls_label.long(),
+        "gt": gt.long(),
+    }

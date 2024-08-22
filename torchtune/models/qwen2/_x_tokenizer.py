@@ -1,0 +1,87 @@
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+import copy
+import numpy as np
+from typing import Any, Dict, List, Mapping, Optional, Tuple
+
+from torchtune.modules.tokenizers import ModelTokenizer
+
+GENE2NUM = {
+    'A': 0,
+    'C': 1,
+    'G': 2,
+    'T': 3,
+}
+
+BASE = 4
+
+MASK_FRAC = 0.15
+
+HYPHEN, MASK, CLS, LABEL = '_', '[MASK]', '[CLS]', 'X'
+
+UN_DETECTED = set(['?_?', 'D_I', 'I_I', 'D_D'])
+
+SPECIAL_TOKENS = {
+    "?_?": 16,
+    "D_I": 17,
+    "I_I": 18,
+    "D_D": 19,
+    "[MASK]": 20,
+    "[CLS]": 21,
+}
+
+LABEL2NUM = {
+    'C': 0,
+    'D': 1,
+}
+
+
+class x_Qwen2Tokenizer(ModelTokenizer):
+
+    def __init__(
+        self,
+        max_seq_len: Optional[int] = None,
+    ):
+        self.max_seq_len = max_seq_len
+
+    def tokenize_messages(
+            self, sample: Dict[str, str]) -> Tuple[List[int], List[bool]]:
+        ids = []
+        should_not_mask = []
+        for x in sample.values():
+            if x in UN_DETECTED:
+                ids.append(SPECIAL_TOKENS[x])
+                should_not_mask.append(True)
+            else:
+                a, b = [GENE2NUM[_] for _ in x.split(HYPHEN)]
+                ids.append(a * BASE + b)
+                should_not_mask.append(False)
+
+        gt = copy.deepcopy(ids)
+        ids = np.asarray(ids)
+        should_not_mask = np.asarray(should_not_mask)
+        t = np.random.rand(len(ids) - should_not_mask.sum()) < MASK_FRAC
+        ids[~should_not_mask] = (
+            1 - t) * ids[~should_not_mask] + t * SPECIAL_TOKENS[MASK]
+
+        tokenized_messages = ids.tolist()
+        masked = (ids != SPECIAL_TOKENS[MASK]).tolist()
+        return tokenized_messages, gt, masked
+
+    def __call__(self, sample: Mapping[str, Any]) -> Mapping[str, Any]:
+        cls_label = LABEL2NUM[sample.pop(LABEL)]
+
+        tokens, gt, masked = self.tokenize_messages(sample)
+        gt.append(SPECIAL_TOKENS[CLS])
+        tokens.append(SPECIAL_TOKENS[CLS])
+        masked.append(True)
+
+        return {
+            "tokens": tokens,
+            "gt": gt,
+            "mask": masked,
+            "cls_label": cls_label,
+        }

@@ -534,6 +534,9 @@ class TiedEmbeddingTransformerDecoder(nn.Module):
         self.head_dim = head_dim
         self.causal_mask = None
 
+        # debug
+        self.cls_layer = nn.Linear(self.tok_embeddings.weight.shape[-1], 2)
+
     def setup_caches(self, batch_size: int, dtype: torch.dtype) -> None:
         """Setup key value caches for attention calculation.
 
@@ -650,9 +653,10 @@ class TiedEmbeddingTransformerDecoder(nn.Module):
                 encoder_mask=encoder_mask,
                 input_pos=input_pos,
             )
-
         # shape: [b, s, d]
         h = self.norm(h)
+        # debug
+        x = self.cls_layer(h[:, -1, :])
 
         # shape: [b, s, out_dim] - out_dim is usually the vocab size
         output = F.linear(h, self.tok_embeddings.weight).float()
@@ -660,4 +664,5 @@ class TiedEmbeddingTransformerDecoder(nn.Module):
         # Output list if hidden states are requested, otherwise just the output
         # TODO: always output a list to have a consistent output type
         output = output if not hidden else [*hidden, output]
-        return output
+        # debug
+        return output, x 

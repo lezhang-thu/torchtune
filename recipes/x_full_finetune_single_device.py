@@ -27,7 +27,6 @@ from torchtune.utils import DummyProfiler, PROFILER_KEY
 
 from tqdm import tqdm
 
-
 log = utils.get_logger("DEBUG")
 
 
@@ -133,6 +132,7 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
         self.max_steps_per_epoch = cfg.max_steps_per_epoch
         self.global_step = 0
 
+
 #    def load_checkpoint(self, cfg_checkpointer: DictConfig) -> Dict[str, Any]:
 #        """
 #        Extract the checkpoint state from file and validate. If resume_from_checkpoint
@@ -157,30 +157,22 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
 
             # on mismatch, warn the user and prevent the override
             if self.seed != ckpt_dict[utils.SEED_KEY]:
-                warn(
-                    message=(
-                        "Config value for seed does not match the checkpoint value, "
-                        f"using the checkpoint value: {ckpt_dict[utils.SEED_KEY]}"
-                    )
-                )
+                warn(message=(
+                    "Config value for seed does not match the checkpoint value, "
+                    f"using the checkpoint value: {ckpt_dict[utils.SEED_KEY]}"))
                 self.seed = ckpt_dict[utils.SEED_KEY]
             if self.max_steps_per_epoch != ckpt_dict[utils.MAX_STEPS_KEY]:
-                warn(
-                    message=(
-                        "Config value for max_steps_per_epoch does not match the checkpoint value, "
-                        f"using the checkpoint value: {ckpt_dict[utils.MAX_STEPS_KEY]}"
-                    )
-                )
+                warn(message=(
+                    "Config value for max_steps_per_epoch does not match the checkpoint value, "
+                    f"using the checkpoint value: {ckpt_dict[utils.MAX_STEPS_KEY]}"
+                ))
                 self.max_steps_per_epoch = ckpt_dict[utils.MAX_STEPS_KEY]
 
             # on mismatch, warn the user but allow the override
             if self.total_epochs != ckpt_dict[utils.TOTAL_EPOCHS_KEY]:
-                warn(
-                    message=(
-                        "Config value for total_epochs does not match the checkpoint value, "
-                        f"using the config value: {self.total_epochs}"
-                    )
-                )
+                warn(message=(
+                    "Config value for total_epochs does not match the checkpoint value, "
+                    f"using the config value: {self.total_epochs}"))
 
         except KeyError as e:
             raise KeyError(
@@ -218,12 +210,13 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
         self._optimizer = self._setup_optimizer(
             cfg_optimizer=cfg.optimizer,
             optimizer_in_bwd=cfg.optimizer_in_bwd,
-            opt_state_dict=(
-                ckpt_dict[utils.OPT_KEY] if self._resume_from_checkpoint else None
-            ),
+            opt_state_dict=(ckpt_dict[utils.OPT_KEY]
+                            if self._resume_from_checkpoint else None),
         )
 
         self._loss_fn = config.instantiate(cfg.loss)
+        # debug
+        self._cls_loss_fn = torch.nn.CrossEntropyLoss()
         log.info("Loss is initialized.")
 
         # sampler and dataloader depend on the tokenizer and loss_fn and should be
@@ -231,6 +224,11 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
         self._sampler, self._dataloader = self._setup_data(
             cfg_dataset=cfg.dataset,
             shuffle=cfg.shuffle,
+            batch_size=cfg.batch_size,
+        )
+        _, self._test_dataloader = self._setup_data(
+            cfg_dataset=cfg.test_dataset,
+            shuffle=False,
             batch_size=cfg.batch_size,
         )
 
@@ -241,13 +239,10 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
         # by the dataloader, the max_steps_per_epoch param set by the user and the
         # gradient_accumulation_steps param. This value is used for logging and tracking
         # training state. The computation should happen after the dataloader has been setup
-        self._steps_per_epoch = (
-            len(self._dataloader) // self._gradient_accumulation_steps
-        )
-        if (
-            self.max_steps_per_epoch is not None
-            and self.max_steps_per_epoch < self._steps_per_epoch
-        ):
+        self._steps_per_epoch = (len(self._dataloader) //
+                                 self._gradient_accumulation_steps)
+        if (self.max_steps_per_epoch is not None and
+                self.max_steps_per_epoch < self._steps_per_epoch):
             self._steps_per_epoch = self.max_steps_per_epoch
         self.global_step = self.epochs_run * self._steps_per_epoch
 
@@ -256,7 +251,8 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
         self._profiler = self._setup_profiler(cfg.get(PROFILER_KEY, None))
 
     def _setup_profiler(
-        self, cfg_profiler: Optional[DictConfig] = None
+        self,
+        cfg_profiler: Optional[DictConfig] = None
     ) -> Union[torch.profiler.profile, DummyProfiler]:
         """
         Parses the `profiler` section of top-level `cfg` and sets up profiler
@@ -306,8 +302,8 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
             cfg_profiler["_component_"] = "torchtune.utils.setup_torch_profiler"
         else:
             assert (
-                cfg_profiler.get("_component_")
-                == "torchtune.utils.setup_torch_profiler"
+                cfg_profiler.get(
+                    "_component_") == "torchtune.utils.setup_torch_profiler"
             ), "Only torch profiler supported currently: component must be `torchtune.utils.setup_torch_profiler`"
 
         profiler, profiler_cfg = config.instantiate(cfg_profiler)
@@ -331,13 +327,13 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
 
         if enable_activation_checkpointing:
             utils.set_activation_checkpointing(
-                model, auto_wrap_policy={modules.TransformerSelfAttentionLayer}
-            )
+                model, auto_wrap_policy={modules.TransformerSelfAttentionLayer})
 
         #model.load_state_dict(model_state_dict)
 
         # Validate model was loaded in with the expected dtype.
-        utils.validate_expected_param_dtype(model.named_parameters(), dtype=self._dtype)
+        utils.validate_expected_param_dtype(model.named_parameters(),
+                                            dtype=self._dtype)
         log.info(f"Model is initialized with precision {self._dtype}.")
 
         # Compile model, if enabled.
@@ -369,11 +365,11 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
                 for p in self._model.parameters()
             }
             # Register optimizer step hooks on the model to run optimizer in backward.
-            utils.register_optim_in_bwd_hooks(model=self._model, optim_dict=optim_dict)
+            utils.register_optim_in_bwd_hooks(model=self._model,
+                                              optim_dict=optim_dict)
             # Create a wrapper for checkpoint save/load of optimizer states when running in backward.
             self._optim_ckpt_wrapper = utils.create_optim_in_bwd_wrapper(
-                model=self._model, optim_dict=optim_dict
-            )
+                model=self._model, optim_dict=optim_dict)
             # Load optimizer states. If optimizer states are being restored in an optimizer in backward
             # run, these need to have been saved with the same setting. Cannot restore from runs that did not
             # use optimizer in backward.
@@ -388,7 +384,8 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
             log.info("In-backward optimizers are set up.")
             return None
         else:
-            optimizer = config.instantiate(cfg_optimizer, self._model.parameters())
+            optimizer = config.instantiate(cfg_optimizer,
+                                           self._model.parameters())
 
             if opt_state_dict:
                 optimizer.load_state_dict(opt_state_dict)
@@ -412,10 +409,8 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
                 for single_cfg_dataset in cfg_dataset
             ]
             ds = ConcatDataset(datasets=datasets)
-            packed = False
         else:
             ds = config.instantiate(cfg_dataset, self._tokenizer)
-            packed = cfg_dataset.get("packed", False)
 
         sampler = DistributedSampler(
             ds,
@@ -428,13 +423,14 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
             dataset=ds,
             batch_size=batch_size,
             sampler=sampler,
+            # debug
             collate_fn=partial(
                 utils.padded_collate,
-                padding_idx=self._tokenizer.pad_id,
+                # debug
+                #padding_idx=self._tokenizer.pad_id,
+                padding_idx=0,
                 ignore_idx=self._loss_fn.ignore_index,
-            )
-            if not packed
-            else None,
+            ),
         )
 
         log.info("Dataset and Sampler are initialized.")
@@ -449,14 +445,12 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
         ckpt_dict = {utils.MODEL_KEY: self._model.state_dict()}
         # if training is in-progress, checkpoint the optimizer state as well
         if epoch + 1 < self.total_epochs:
-            ckpt_dict.update(
-                {
-                    utils.SEED_KEY: self.seed,
-                    utils.EPOCHS_KEY: self.epochs_run,
-                    utils.TOTAL_EPOCHS_KEY: self.total_epochs,
-                    utils.MAX_STEPS_KEY: self.max_steps_per_epoch,
-                }
-            )
+            ckpt_dict.update({
+                utils.SEED_KEY: self.seed,
+                utils.EPOCHS_KEY: self.epochs_run,
+                utils.TOTAL_EPOCHS_KEY: self.total_epochs,
+                utils.MAX_STEPS_KEY: self.max_steps_per_epoch,
+            })
             if not self._optimizer_in_bwd:
                 ckpt_dict[utils.OPT_KEY] = self._optimizer.state_dict()
             else:
@@ -475,15 +469,18 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
         mask = batch.get("mask", None)  # shape [b, s, s]
         input_pos = batch.get("input_pos", None)  # shape [b, s]
 
-        logits = self._model(tokens, mask=mask, input_pos=input_pos)
-        # Shift so that tokens < n predict n
-        logits = logits[..., :-1, :].contiguous()
-        labels = labels[..., 1:].contiguous()
+        #logits, cls = self._model(tokens, mask=mask, input_pos=input_pos)
+        # debug
+        #print('batch["gt"].shape: {}'.format(batch["gt"].shape))
+        #exit(0)
+        logits, cls = self._model(batch["gt"])
+        gt_cls = batch["cls_label"]
         logits = logits.transpose(1, 2)
         # Compute loss
-        loss = self._loss_fn(logits, labels)
+        #loss = self._loss_fn(logits, labels) + self._cls_loss_fn(cls, gt_cls)
+        loss = self._cls_loss_fn(cls, gt_cls)
         # free logits otherwise it peaks backward memory
-        del logits
+        del logits, cls
 
         return loss
 
@@ -504,21 +501,26 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
         t0 = time.perf_counter()
         running_loss = 0
         num_tokens = 0
+        # debug
+        ema_loss = None
 
         self._profiler.start()
         # self.epochs_run should be non-zero when we're resuming from a checkpoint
         for curr_epoch in range(self.epochs_run, self.total_epochs):
+            # debug
+            if curr_epoch > 30:
+                #pass
+                self.evaluate()
+
             # Update the sampler to ensure data is correctly shuffled across epochs
             # in case shuffle is True
             self._sampler.set_epoch(curr_epoch)
 
             pbar = tqdm(total=self._steps_per_epoch)
             for idx, batch in enumerate(self._dataloader):
-                if (
-                    self.max_steps_per_epoch is not None
-                    and (idx // self._gradient_accumulation_steps)
-                    == self.max_steps_per_epoch
-                ):
+                if (self.max_steps_per_epoch is not None and
+                    (idx // self._gradient_accumulation_steps)
+                        == self.max_steps_per_epoch):
                     break
 
                 batch = {k: v.to(self._device) for k, v in batch.items()}
@@ -537,32 +539,35 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
 
                     self.global_step += 1
 
-                    loss_to_log = running_loss.item()
+                    x = running_loss.item()
+                    if ema_loss is None:
+                        ema_loss = x
+                    else: ema_loss = ema_loss * 0.99 + 0.01 * x
                     pbar.update(1)
                     pbar.set_description(
-                        f"{curr_epoch + 1}|{self.global_step}|Loss: {loss_to_log}"
-                    )
+                        "{}|{}|Loss: {:.4f}".format(curr_epoch + 1, self.global_step, ema_loss))
 
                     # Log per-step metrics
-                    if self.global_step % self._log_every_n_steps == 0:
-                        time_per_step = time.perf_counter() - t0
-                        log_dict = {
-                            "loss": loss_to_log,
-                            # NOTE: for optim in backward, this assumes all optimizers have the same LR. This is currently
-                            # true since we don't expose the ability to configure this yet.
-                            "lr": (
-                                self._optim_ckpt_wrapper.get_optim_key("lr")
-                                if self._optimizer_in_bwd
-                                else self._optimizer.param_groups[0]["lr"]
-                            ),
-                            "tokens_per_second_per_gpu": num_tokens / time_per_step,
-                        }
-                        if self._device.type == "cuda" and self._log_peak_memory_stats:
-                            log_dict.update(utils.get_memory_stats(device=self._device))
-                        self._metric_logger.log_dict(
-                            log_dict,
-                            step=self.global_step,
-                        )
+                    #if self.global_step % self._log_every_n_steps == 0:
+                    #    time_per_step = time.perf_counter() - t0
+                    #    log_dict = {
+                    #        "loss":
+                    #            loss_to_log,
+                    #        # NOTE: for optim in backward, this assumes all optimizers have the same LR. This is currently
+                    #        # true since we don't expose the ability to configure this yet.
+                    #        "lr": (self._optim_ckpt_wrapper.get_optim_key("lr")
+                    #               if self._optimizer_in_bwd else
+                    #               self._optimizer.param_groups[0]["lr"]),
+                    #        "tokens_per_second_per_gpu":
+                    #            num_tokens / time_per_step,
+                    #    }
+                    #    if self._device.type == "cuda" and self._log_peak_memory_stats:
+                    #        log_dict.update(
+                    #            utils.get_memory_stats(device=self._device))
+                    #    self._metric_logger.log_dict(
+                    #        log_dict,
+                    #        step=self.global_step,
+                    #    )
 
                     # Reset running stats for the next step
                     running_loss = 0
@@ -575,12 +580,31 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
                 self._profiler.step()
 
             self.epochs_run += 1
-            self.save_checkpoint(epoch=curr_epoch)
+            # debug
+            #self.save_checkpoint(epoch=curr_epoch)
 
+        self.evaluate()
         self._profiler.stop()
 
     def cleanup(self) -> None:
         self._metric_logger.close()
+
+    @torch.no_grad
+    def evaluate(self):
+        self._model.eval()
+        right, wrong = 0, 0
+        for idx, batch in enumerate(self._test_dataloader):
+            batch = {k: v.to(self._device) for k, v in batch.items()}
+            _, cls = self._model(batch["gt"])
+            if batch["cls_label"].item() == cls.argmax().item():
+                right += 1
+            else:
+                wrong += 1
+            #print("Right: {}, Wrong: {}".format(right, wrong))
+        print('#' * 20, '- start')
+        print("Right: {}, Wrong: {}".format(right, wrong))
+        print('#' * 20, '- end')
+        self._model.train()
 
 
 @config.parse

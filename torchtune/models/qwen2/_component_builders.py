@@ -94,6 +94,9 @@ def qwen2(
         pos_embeddings=rope,
         kv_cache=None,
         max_seq_len=max_seq_len,
+        # debug ** IMPORTANT** - start
+        #is_causal=False,
+        # debug ** IMPORTANT** - end
         attn_dropout=attn_dropout,
     )
     mlp = qwen2_mlp(dim=embed_dim, hidden_dim=intermediate_dim)
