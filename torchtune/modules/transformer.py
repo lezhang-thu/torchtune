@@ -535,7 +535,8 @@ class TiedEmbeddingTransformerDecoder(nn.Module):
         self.causal_mask = None
 
         # debug
-        self.cls_layer = nn.Linear(self.tok_embeddings.weight.shape[-1], 2)
+        # on `bias=False`
+        self.cls_layer = nn.Linear(self.tok_embeddings.weight.shape[-1], 2, bias=False)
 
     def setup_caches(self, batch_size: int, dtype: torch.dtype) -> None:
         """Setup key value caches for attention calculation.

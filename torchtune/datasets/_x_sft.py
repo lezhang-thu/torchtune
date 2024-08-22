@@ -67,9 +67,9 @@ def x_bio_dataset(
 
 
 bio_dataset = partial(x_bio_dataset,
-                      source="/home/ubuntu/lezhang.thu/biology-research/splits")
+                      source="./train-split")
 test_bio_dataset = partial(
     x_bio_dataset,
-    source="/home/ubuntu/lezhang.thu/biology-research/test-splits",
+    source="./test-split",
     split="test",
 )
