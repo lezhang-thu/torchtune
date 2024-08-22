@@ -9,7 +9,7 @@ import argparse
 # debug - start
 import sys
 
-sys.path.insert(0, '/home/ubuntu/lezhang.thu/biology-research/torchtune')
+sys.path.insert(0, '.')
 # debug - end
 
 from torchtune._cli.cp import Copy
