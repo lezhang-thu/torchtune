@@ -18,6 +18,7 @@
 # Tokenizer
 tokenizer:
   _component_: torchtune.models.qwen2.x_qwen2_tokenizer
+  max_seq_len: 83899
 
 # Dataset
 dataset:

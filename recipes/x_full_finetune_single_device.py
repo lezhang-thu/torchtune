@@ -469,18 +469,18 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
         mask = batch.get("mask", None)  # shape [b, s, s]
         input_pos = batch.get("input_pos", None)  # shape [b, s]
 
-        #logits, cls = self._model(tokens, mask=mask, input_pos=input_pos)
-        # debug
-        #print('batch["gt"].shape: {}'.format(batch["gt"].shape))
-        #exit(0)
-        logits, cls = self._model(batch["gt"])
-        gt_cls = batch["cls_label"]
+        logits, _ = self._model(tokens, mask=mask, input_pos=input_pos)
         logits = logits.transpose(1, 2)
+        (self._loss_fn(logits, labels) /
+         self._gradient_accumulation_steps).backward()
+        del logits, _
+
+        _, cls = self._model(batch["gt"])
+        gt_cls = batch["cls_label"]
         # Compute loss
-        #loss = self._loss_fn(logits, labels) + self._cls_loss_fn(cls, gt_cls)
         loss = self._cls_loss_fn(cls, gt_cls)
         # free logits otherwise it peaks backward memory
-        del logits, cls
+        del _, cls
 
         return loss
 
@@ -542,10 +542,11 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
                     x = running_loss.item()
                     if ema_loss is None:
                         ema_loss = x
-                    else: ema_loss = ema_loss * 0.99 + 0.01 * x
+                    else:
+                        ema_loss = ema_loss * 0.99 + 0.01 * x
                     pbar.update(1)
-                    pbar.set_description(
-                        "{}|{}|Loss: {:.4f}".format(curr_epoch + 1, self.global_step, ema_loss))
+                    pbar.set_description("{}|{}|Loss: {:.4f}".format(
+                        curr_epoch + 1, self.global_step, ema_loss))
 
                     # Log per-step metrics
                     #if self.global_step % self._log_every_n_steps == 0:

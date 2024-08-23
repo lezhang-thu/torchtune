@@ -38,12 +38,14 @@ class BioDataset(Dataset):
     def _prepare_sample(self, sample: Mapping[str, Any]) -> Dict[str, Any]:
         tokenized_dict = self._model_transform(sample)
 
-        # Wherever mask == True, set to CROSS_ENTROPY_IGNORE_IDX. Otherwise keep as tokens
+        # Wherever masked == False, set to CROSS_ENTROPY_IGNORE_IDX. Otherwise keep as tokens
+        masked = tokenized_dict.pop("mask")
         tokenized_dict["labels"] = list(
             np.where(
-                tokenized_dict["mask"],
-                CROSS_ENTROPY_IGNORE_IDX,
+                masked,
+                # debug: "mask" meaning
                 tokenized_dict["gt"],
+                CROSS_ENTROPY_IGNORE_IDX,
             ))
         assert len(tokenized_dict["tokens"]) == len(tokenized_dict["labels"])
 

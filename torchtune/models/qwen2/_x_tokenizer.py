@@ -18,7 +18,7 @@ GENE2NUM = {
 
 BASE = 4
 
-MASK_FRAC = 0.15
+MASK_PROB, RANDOM_TOKEN_PROB, LEAVE_UNMASKED_PROB = 0.15, 0.1, 0.1
 
 HYPHEN, MASK, CLS, LABEL = '_', '[MASK]', '[CLS]', 'X'
 
@@ -46,29 +46,60 @@ class x_Qwen2Tokenizer(ModelTokenizer):
         max_seq_len: Optional[int] = None,
     ):
         self.max_seq_len = max_seq_len
+        self.max_range = np.arange(max_seq_len - 1)
 
     def tokenize_messages(
             self, sample: Dict[str, str]) -> Tuple[List[int], List[bool]]:
         ids = []
-        should_not_mask = []
+        mask_pos_okay = []
         for x in sample.values():
             if x in UN_DETECTED:
                 ids.append(SPECIAL_TOKENS[x])
-                should_not_mask.append(True)
+                mask_pos_okay.append(False)
             else:
                 a, b = [GENE2NUM[_] for _ in x.split(HYPHEN)]
                 ids.append(a * BASE + b)
-                should_not_mask.append(False)
+                mask_pos_okay.append(True)
 
         gt = copy.deepcopy(ids)
+
         ids = np.asarray(ids)
-        should_not_mask = np.asarray(should_not_mask)
-        t = np.random.rand(len(ids) - should_not_mask.sum()) < MASK_FRAC
-        ids[~should_not_mask] = (
-            1 - t) * ids[~should_not_mask] + t * SPECIAL_TOKENS[MASK]
+        mask_pos_okay = np.asarray(mask_pos_okay)
+
+        sz = len(ids)
+        # decide elements to mask
+        mask = np.full(sz, False)
+        num_mask = int(
+            # add a random number for probabilistic rounding
+            MASK_PROB * sz + np.random.random())
+
+        mask_idc = np.random.choice(self.max_range[mask_pos_okay],
+                                    num_mask,
+                                    replace=False)
+        mask[mask_idc] = True
+        # IMPORTANT!!! - start
+        masked = copy.deepcopy(mask).tolist()
+        # IMPORTANT!!! - end
+
+        # decide unmasking and random replacement
+        rand_or_unmask_prob = RANDOM_TOKEN_PROB + LEAVE_UNMASKED_PROB
+        rand_or_unmask = mask & (np.random.random(sz) < rand_or_unmask_prob)
+        unmask_prob = LEAVE_UNMASKED_PROB / rand_or_unmask_prob
+        decision = np.random.random(sz) < unmask_prob
+        unmask = rand_or_unmask & decision
+        rand_mask = rand_or_unmask & (~decision)
+
+        mask = mask ^ unmask
+
+        ids[mask] = SPECIAL_TOKENS[MASK]
+        num_rand = rand_mask.sum()
+        if num_rand > 0:
+            ids[rand_mask] = np.random.choice(
+                BASE**2,
+                num_rand,
+            )
 
         tokenized_messages = ids.tolist()
-        masked = (ids != SPECIAL_TOKENS[MASK]).tolist()
         return tokenized_messages, gt, masked
 
     def __call__(self, sample: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -77,7 +108,7 @@ class x_Qwen2Tokenizer(ModelTokenizer):
         tokens, gt, masked = self.tokenize_messages(sample)
         gt.append(SPECIAL_TOKENS[CLS])
         tokens.append(SPECIAL_TOKENS[CLS])
-        masked.append(True)
+        masked.append(False)
 
         return {
             "tokens": tokens,
