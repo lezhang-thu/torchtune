@@ -471,8 +471,8 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
 
         logits, _ = self._model(tokens, mask=mask, input_pos=input_pos)
         logits = logits.transpose(1, 2)
-        (self._loss_fn(logits, labels) /
-         self._gradient_accumulation_steps).backward()
+        (.01 * (self._loss_fn(logits, labels) /
+                self._gradient_accumulation_steps)).backward()
         del logits, _
 
         _, cls = self._model(batch["gt"])
@@ -508,7 +508,8 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
         # self.epochs_run should be non-zero when we're resuming from a checkpoint
         for curr_epoch in range(self.epochs_run, self.total_epochs):
             # debug
-            if curr_epoch > 30:
+            #if curr_epoch > 30:
+            if curr_epoch > 10:
                 #pass
                 self.evaluate()
 

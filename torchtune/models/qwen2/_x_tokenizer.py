@@ -89,11 +89,14 @@ class x_Qwen2Tokenizer(ModelTokenizer):
         unmask = rand_or_unmask & decision
         rand_mask = rand_or_unmask & (~decision)
 
-        mask = mask ^ unmask
+        # debug
+        #mask = mask ^ unmask
 
         ids[mask] = SPECIAL_TOKENS[MASK]
         num_rand = rand_mask.sum()
-        if num_rand > 0:
+        # debug
+        #if num_rand > 0:
+        if False:
             ids[rand_mask] = np.random.choice(
                 BASE**2,
                 num_rand,
