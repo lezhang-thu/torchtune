@@ -32,19 +32,15 @@ shuffle: True
 model:
   _component_: torchtune.models.qwen2.qwen2_x
 
-checkpointer:
-  _component_: torchtune.utils.FullModelHFCheckpointer
-  recipe_checkpoint: null
-  output_dir: /tmp/Qwen2-0.5B-Instruct-finetune
-  model_type: QWEN2
-resume_from_checkpoint: False
+resume_from_checkpoint: null
+#resume_from_checkpoint: biology-research/model-8-26/biology-qwen2-epoch_1.pt
 
 # Fine-tuning arguments
 # debug
 #batch_size: 2
 batch_size: 1
 #epochs: 1
-epochs: 100 
+epochs: 100
 optimizer:
   _component_: torch.optim.AdamW
   #lr: 2e-5
@@ -72,6 +68,7 @@ dtype: bf16
 metric_logger:
   _component_: torchtune.utils.metric_logging.DiskLogger
   log_dir: ${output_dir}
-output_dir: /tmp/Qwen2-0.5B-Instruct-finetune
+#output_dir: /tmp/Qwen2-0.5B-Instruct-finetune
+output_dir: biology-research/model-8-26
 log_every_n_steps: 1
 log_peak_memory_stats: False

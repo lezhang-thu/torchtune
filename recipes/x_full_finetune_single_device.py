@@ -132,54 +132,6 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
         self.max_steps_per_epoch = cfg.max_steps_per_epoch
         self.global_step = 0
 
-
-#    def load_checkpoint(self, cfg_checkpointer: DictConfig) -> Dict[str, Any]:
-#        """
-#        Extract the checkpoint state from file and validate. If resume_from_checkpoint
-#        is True, this also includes the recipe state.
-#        """
-#        self._checkpointer = config.instantiate(
-#            cfg_checkpointer,
-#            resume_from_checkpoint=self._resume_from_checkpoint,
-#        )
-#        checkpoint_dict = self._checkpointer.load_checkpoint()
-#
-#        if self._resume_from_checkpoint:
-#            self._update_recipe_state(checkpoint_dict)
-#        return checkpoint_dict
-
-    def _update_recipe_state(self, ckpt_dict: Dict[str, Any]) -> None:
-        """
-        Updates the recipe state from checkpoint.
-        """
-        try:
-            self.epochs_run = ckpt_dict[utils.EPOCHS_KEY]
-
-            # on mismatch, warn the user and prevent the override
-            if self.seed != ckpt_dict[utils.SEED_KEY]:
-                warn(message=(
-                    "Config value for seed does not match the checkpoint value, "
-                    f"using the checkpoint value: {ckpt_dict[utils.SEED_KEY]}"))
-                self.seed = ckpt_dict[utils.SEED_KEY]
-            if self.max_steps_per_epoch != ckpt_dict[utils.MAX_STEPS_KEY]:
-                warn(message=(
-                    "Config value for max_steps_per_epoch does not match the checkpoint value, "
-                    f"using the checkpoint value: {ckpt_dict[utils.MAX_STEPS_KEY]}"
-                ))
-                self.max_steps_per_epoch = ckpt_dict[utils.MAX_STEPS_KEY]
-
-            # on mismatch, warn the user but allow the override
-            if self.total_epochs != ckpt_dict[utils.TOTAL_EPOCHS_KEY]:
-                warn(message=(
-                    "Config value for total_epochs does not match the checkpoint value, "
-                    f"using the config value: {self.total_epochs}"))
-
-        except KeyError as e:
-            raise KeyError(
-                "Checkpoint does not contain the required keys needed for updating recipe state. "
-                "Are you sure you passed in the right recipe checkpoint?"
-            ) from e
-
     def setup(self, cfg: DictConfig) -> None:
         """
         Sets up the recipe state correctly. This includes setting recipe attributes based
@@ -202,6 +154,16 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
             compile_model=self._model_compile,
             #model_state_dict=ckpt_dict[utils.MODEL_KEY],
         )
+        # debug
+        if self._resume_from_checkpoint:
+            print('#' * 20)
+            print('Loading model...')
+            self._model.load_state_dict(torch.load(self._resume_from_checkpoint,
+                                                   weights_only=True),
+                                        strict=True)
+            print('LOAD MODEL SUCCESS!!!')
+            print('#' * 20)
+
         self._tokenizer = config.instantiate(cfg.tokenizer)
         log.info("Tokenizer is initialized from file.")
 
@@ -210,8 +172,9 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
         self._optimizer = self._setup_optimizer(
             cfg_optimizer=cfg.optimizer,
             optimizer_in_bwd=cfg.optimizer_in_bwd,
-            opt_state_dict=(ckpt_dict[utils.OPT_KEY]
-                            if self._resume_from_checkpoint else None),
+            opt_state_dict=None,
+            #opt_state_dict=(ckpt_dict[utils.OPT_KEY]
+            #                if self._resume_from_checkpoint else None),
         )
 
         self._loss_fn = config.instantiate(cfg.loss)
@@ -438,28 +401,12 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
         return sampler, dataloader
 
     def save_checkpoint(self, epoch: int) -> None:
-        """
-        Save state dict to file. The recipe save_checkpoint method is responsible for
-        correctly creating the checkpoint dict and passing to the checkpointer.
-        """
-        ckpt_dict = {utils.MODEL_KEY: self._model.state_dict()}
-        # if training is in-progress, checkpoint the optimizer state as well
-        if epoch + 1 < self.total_epochs:
-            ckpt_dict.update({
-                utils.SEED_KEY: self.seed,
-                utils.EPOCHS_KEY: self.epochs_run,
-                utils.TOTAL_EPOCHS_KEY: self.total_epochs,
-                utils.MAX_STEPS_KEY: self.max_steps_per_epoch,
-            })
-            if not self._optimizer_in_bwd:
-                ckpt_dict[utils.OPT_KEY] = self._optimizer.state_dict()
-            else:
-                ckpt_dict[utils.OPT_KEY] = self._optim_ckpt_wrapper.state_dict()
-        self._checkpointer.save_checkpoint(
-            ckpt_dict,
-            epoch=epoch,
-            intermediate_checkpoint=(epoch + 1 < self.total_epochs),
-        )
+        print('Saving model...')
+        os.makedirs(self._output_dir, exist_ok=True)
+        PATH = os.path.join(self._output_dir,
+                            'biology-qwen2-epoch_{}.pt'.format(epoch))
+        torch.save(self._model.state_dict(), PATH)
+        print('SAVE MODEL SUCCESS')
 
     def _loss_step(self, batch: Dict[str, torch.Tensor]) -> torch.Tensor:
         # Both are shape [b, s]
@@ -505,11 +452,13 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
         ema_loss = None
 
         self._profiler.start()
+        # debug
+        print('self._model.training: {}'.format(self._model.training))
         # self.epochs_run should be non-zero when we're resuming from a checkpoint
         for curr_epoch in range(self.epochs_run, self.total_epochs):
             # debug
             #if curr_epoch > 30:
-            if curr_epoch > 10:
+            if curr_epoch > 50:
                 #pass
                 self.evaluate()
 
@@ -586,6 +535,9 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
             #self.save_checkpoint(epoch=curr_epoch)
 
         self.evaluate()
+        # debug
+        self.save_checkpoint(epoch=self.total_epochs)
+
         self._profiler.stop()
 
     def cleanup(self) -> None:
