@@ -308,7 +308,7 @@ def qwen2_x() -> TiedEmbeddingTransformerDecoder:
     """
     return qwen2(
         #vocab_size=151936,
-        # ACGT_ACGT 16 + ['?_?', 'D_I', 'I_I', 'D_D'] 4 + [MASK] 1 + [CLS] 1
+        # ACGT_ACGT 16 + ['?_?', 'D_I', 'I_I', 'D_D'] 4 + [BOS] 1 + [CLS] 1
         vocab_size=16 + 4 + 1 + 1,
         #num_layers=24,
         num_layers=2,
@@ -319,7 +319,7 @@ def qwen2_x() -> TiedEmbeddingTransformerDecoder:
         intermediate_dim=4864,
         #intermediate_dim=1024,
         #max_seq_len=32768,
-        max_seq_len=83898 + 1,
+        max_seq_len=83898 + 2,
         attn_dropout=0.0,
         norm_eps=1e-06,
         rope_base=1000000.0,

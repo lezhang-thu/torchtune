@@ -415,20 +415,18 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
         # exist. Currently, only sample packing in PackedDataset returns these
         mask = batch.get("mask", None)  # shape [b, s, s]
         input_pos = batch.get("input_pos", None)  # shape [b, s]
-
-        logits, _ = self._model(tokens, mask=mask, input_pos=input_pos)
-        logits = logits.transpose(1, 2)
-        (.01 * (self._loss_fn(logits, labels) /
-                self._gradient_accumulation_steps)).backward()
-        del logits, _
-
-        _, cls = self._model(batch["gt"])
         gt_cls = batch["cls_label"]
-        # Compute loss
-        loss = self._cls_loss_fn(cls, gt_cls)
-        # free logits otherwise it peaks backward memory
-        del _, cls
 
+        logits, cls = self._model(tokens, mask=mask, input_pos=input_pos)
+        # Shift so that tokens < n predict n
+        logits = logits[..., :-2, :].contiguous()
+        labels = labels[..., 1:-1].contiguous()
+        logits = logits.transpose(1, 2)
+
+        # Compute loss
+        loss = self._cls_loss_fn(cls, gt_cls) + .01 * self._loss_fn(logits, labels)
+        # free logits otherwise it peaks backward memory
+        del logits, cls
         return loss
 
     def train(self) -> None:
@@ -457,8 +455,7 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
         # self.epochs_run should be non-zero when we're resuming from a checkpoint
         for curr_epoch in range(self.epochs_run, self.total_epochs):
             # debug
-            #if curr_epoch > 30:
-            if curr_epoch > 50:
+            if curr_epoch > 30:
                 #pass
                 self.evaluate()
 

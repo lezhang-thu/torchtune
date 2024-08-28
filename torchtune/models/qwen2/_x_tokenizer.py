@@ -19,8 +19,9 @@ GENE2NUM = {
 BASE = 4
 
 MASK_PROB, RANDOM_TOKEN_PROB, LEAVE_UNMASKED_PROB = 0.15, 0.1, 0.1
+#MASK_PROB, RANDOM_TOKEN_PROB, LEAVE_UNMASKED_PROB = 0.001, 0.1, 0.1
 
-HYPHEN, MASK, CLS, LABEL = '_', '[MASK]', '[CLS]', 'X'
+HYPHEN, BOS, CLS, LABEL = '_', '[BOS]', '[CLS]', 'X'
 
 UN_DETECTED = set(['?_?', 'D_I', 'I_I', 'D_D'])
 
@@ -29,7 +30,7 @@ SPECIAL_TOKENS = {
     "D_I": 17,
     "I_I": 18,
     "D_D": 19,
-    "[MASK]": 20,
+    "[BOS]": 20,
     "[CLS]": 21,
 }
 
@@ -60,6 +61,13 @@ class x_Qwen2Tokenizer(ModelTokenizer):
                 a, b = [GENE2NUM[_] for _ in x.split(HYPHEN)]
                 ids.append(a * BASE + b)
                 mask_pos_okay.append(True)
+        
+        # debug - start - 2024-8-28
+        masked = copy.deepcopy(mask_pos_okay)
+        tokenized_messages = copy.deepcopy(ids)
+        gt = copy.deepcopy(ids)
+        return tokenized_messages, gt, masked
+        # debug - end
 
         gt = copy.deepcopy(ids)
 
@@ -109,6 +117,11 @@ class x_Qwen2Tokenizer(ModelTokenizer):
         cls_label = LABEL2NUM[sample.pop(LABEL)]
 
         tokens, gt, masked = self.tokenize_messages(sample)
+
+        gt.insert(0, SPECIAL_TOKENS[BOS])
+        tokens.insert(0, SPECIAL_TOKENS[BOS])
+        masked.insert(0, False)
+
         gt.append(SPECIAL_TOKENS[CLS])
         tokens.append(SPECIAL_TOKENS[CLS])
         masked.append(False)

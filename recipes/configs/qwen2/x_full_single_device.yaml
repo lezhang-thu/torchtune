@@ -18,7 +18,7 @@
 # Tokenizer
 tokenizer:
   _component_: torchtune.models.qwen2.x_qwen2_tokenizer
-  max_seq_len: 83899
+  max_seq_len: 83900 
 
 # Dataset
 dataset:
@@ -33,7 +33,7 @@ model:
   _component_: torchtune.models.qwen2.qwen2_x
 
 resume_from_checkpoint: null
-#resume_from_checkpoint: biology-research/model-8-26/biology-qwen2-epoch_1.pt
+#resume_from_checkpoint: biology-research/model-8-26/biology-qwen2-epoch_100.pt
 
 # Fine-tuning arguments
 # debug
