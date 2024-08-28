@@ -424,7 +424,7 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
         logits = logits.transpose(1, 2)
 
         # Compute loss
-        loss = self._cls_loss_fn(cls, gt_cls) + .01 * self._loss_fn(logits, labels)
+        loss = self._cls_loss_fn(cls, gt_cls) + 1e-3 * self._loss_fn(logits, labels)
         # free logits otherwise it peaks backward memory
         del logits, cls
         return loss
@@ -455,7 +455,7 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
         # self.epochs_run should be non-zero when we're resuming from a checkpoint
         for curr_epoch in range(self.epochs_run, self.total_epochs):
             # debug
-            if curr_epoch > 30:
+            if curr_epoch > 5:
                 #pass
                 self.evaluate()
 
