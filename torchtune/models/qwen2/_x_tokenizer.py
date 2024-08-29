@@ -47,7 +47,8 @@ class x_Qwen2Tokenizer(ModelTokenizer):
         max_seq_len: Optional[int] = None,
     ):
         self.max_seq_len = max_seq_len
-        self.max_range = np.arange(max_seq_len - 1)
+        # except [BOS] & [CLS]
+        self.max_range = np.arange(max_seq_len - 2)
 
     def tokenize_messages(
             self, sample: Dict[str, str]) -> Tuple[List[int], List[bool]]:
@@ -61,16 +62,8 @@ class x_Qwen2Tokenizer(ModelTokenizer):
                 a, b = [GENE2NUM[_] for _ in x.split(HYPHEN)]
                 ids.append(a * BASE + b)
                 mask_pos_okay.append(True)
-        
-        # debug - start - 2024-8-28
-        masked = copy.deepcopy(mask_pos_okay)
-        tokenized_messages = copy.deepcopy(ids)
-        gt = copy.deepcopy(ids)
-        return tokenized_messages, gt, masked
-        # debug - end
 
         gt = copy.deepcopy(ids)
-
         ids = np.asarray(ids)
         mask_pos_okay = np.asarray(mask_pos_okay)
 
@@ -89,29 +82,10 @@ class x_Qwen2Tokenizer(ModelTokenizer):
         masked = copy.deepcopy(mask).tolist()
         # IMPORTANT!!! - end
 
-        # decide unmasking and random replacement
-        rand_or_unmask_prob = RANDOM_TOKEN_PROB + LEAVE_UNMASKED_PROB
-        rand_or_unmask = mask & (np.random.random(sz) < rand_or_unmask_prob)
-        unmask_prob = LEAVE_UNMASKED_PROB / rand_or_unmask_prob
-        decision = np.random.random(sz) < unmask_prob
-        unmask = rand_or_unmask & decision
-        rand_mask = rand_or_unmask & (~decision)
-
-        # debug
-        #mask = mask ^ unmask
-
-        ids[mask] = SPECIAL_TOKENS[MASK]
-        num_rand = rand_mask.sum()
-        # debug
-        #if num_rand > 0:
-        if False:
-            ids[rand_mask] = np.random.choice(
-                BASE**2,
-                num_rand,
-            )
-
+        # debug - start - 2024-8-29
         tokenized_messages = ids.tolist()
         return tokenized_messages, gt, masked
+        # debug - end
 
     def __call__(self, sample: Mapping[str, Any]) -> Mapping[str, Any]:
         cls_label = LABEL2NUM[sample.pop(LABEL)]
