@@ -40,7 +40,7 @@ resume_from_checkpoint: null
 #batch_size: 2
 batch_size: 1
 #epochs: 1
-epochs: 100
+epochs: 30
 optimizer:
   _component_: torch.optim.AdamW
   #lr: 2e-5

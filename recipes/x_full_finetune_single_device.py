@@ -25,7 +25,7 @@ from torchtune.datasets import ConcatDataset
 from torchtune.recipe_interfaces import FTRecipeInterface
 from torchtune.utils import DummyProfiler, PROFILER_KEY
 
-from tqdm import tqdm
+#from tqdm import tqdm
 
 log = utils.get_logger("DEBUG")
 
@@ -463,6 +463,7 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
         print('self._model.training: {}'.format(self._model.training))
         # self.epochs_run should be non-zero when we're resuming from a checkpoint
         for curr_epoch in range(self.epochs_run, self.total_epochs):
+            print('Epoch: {}'.format(curr_epoch))
             # debug
             if curr_epoch > 5:
                 #pass
@@ -485,7 +486,7 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
             # in case shuffle is True
             self._sampler.set_epoch(curr_epoch)
 
-            pbar = tqdm(total=self._steps_per_epoch)
+            #pbar = tqdm(total=self._steps_per_epoch)
             for idx, batch in enumerate(self._dataloader):
                 if (self.max_steps_per_epoch is not None and
                     (idx // self._gradient_accumulation_steps)
@@ -513,9 +514,10 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
                         ema_loss = x
                     else:
                         ema_loss = ema_loss * 0.99 + 0.01 * x
-                    pbar.update(1)
-                    pbar.set_description("{}|{}|Loss: {:.4f}".format(
-                        curr_epoch + 1, self.global_step, ema_loss))
+                    print('Loss: {:.4f}'.format(ema_loss))
+                    #pbar.update(1)
+                    #pbar.set_description("{}|{}|Loss: {:.4f}".format(
+                    #    curr_epoch + 1, self.global_step, ema_loss))
 
                     # Log per-step metrics
                     #if self.global_step % self._log_every_n_steps == 0:
@@ -555,7 +557,7 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
 
         self.evaluate()
         # debug
-        self.save_checkpoint(epoch=self.total_epochs)
+        #self.save_checkpoint(epoch=self.total_epochs)
 
         self._profiler.stop()
 
