@@ -431,8 +431,9 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
         logits = logits.transpose(1, 2)
 
         # Compute loss
-        x = 0 if test else self.ratio * self._cls_loss_fn(cls, gt_cls)
-        loss = 1e-2 * self._loss_fn(logits, labels) + x
+        #x = 0 if test else self.ratio * self._cls_loss_fn(cls, gt_cls)
+        x = 0 if test else self._cls_loss_fn(cls, gt_cls)
+        loss = 1e-3 * self._loss_fn(logits, labels) + x
         # free logits otherwise it peaks backward memory
         del logits, cls
         return loss
@@ -466,19 +467,19 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
             if curr_epoch > 5:
                 #pass
                 self.evaluate()
-            # debug - start - 2024.8.29
-            print('Unsupervised learning over test data...')
-            self._test_sampler.set_epoch(curr_epoch)
-            for idx, batch in enumerate(self._test_dataloader):
-                batch = {k: v.to(self._device) for k, v in batch.items()}
-                loss = self._loss_step(
-                    batch, test=True) / self._gradient_accumulation_steps
-                loss.backward()
-                if (idx + 1) % self._gradient_accumulation_steps == 0:
-                    self._optimizer.step()
-                    self._optimizer.zero_grad(set_to_none=True)
-            print('Unsupervised learning ENDED!!!')
-            # debug - end - 2024.8.29
+            ## debug - start - 2024.8.29
+            #print('Unsupervised learning over test data...')
+            #self._test_sampler.set_epoch(curr_epoch)
+            #for idx, batch in enumerate(self._test_dataloader):
+            #    batch = {k: v.to(self._device) for k, v in batch.items()}
+            #    loss = self._loss_step(
+            #        batch, test=True) / self._gradient_accumulation_steps
+            #    loss.backward()
+            #    if (idx + 1) % self._gradient_accumulation_steps == 0:
+            #        self._optimizer.step()
+            #        self._optimizer.zero_grad(set_to_none=True)
+            #print('Unsupervised learning ENDED!!!')
+            ## debug - end - 2024.8.29
 
             # Update the sampler to ensure data is correctly shuffled across epochs
             # in case shuffle is True

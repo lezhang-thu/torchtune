@@ -65,26 +65,26 @@ class x_Qwen2Tokenizer(ModelTokenizer):
 
         gt = copy.deepcopy(ids)
         ids = np.asarray(ids)
-        mask_pos_okay = np.asarray(mask_pos_okay)
+        #mask_pos_okay = np.asarray(mask_pos_okay)
 
-        sz = len(ids)
-        # decide elements to mask
-        mask = np.full(sz, False)
-        num_mask = int(
-            # add a random number for probabilistic rounding
-            MASK_PROB * sz + np.random.random())
+        #sz = len(ids)
+        ## decide elements to mask
+        #mask = np.full(sz, False)
+        #num_mask = int(
+        #    # add a random number for probabilistic rounding
+        #    MASK_PROB * sz + np.random.random())
 
-        mask_idc = np.random.choice(self.max_range[mask_pos_okay],
-                                    num_mask,
-                                    replace=False)
-        mask[mask_idc] = True
-        # IMPORTANT!!! - start
-        masked = copy.deepcopy(mask).tolist()
-        # IMPORTANT!!! - end
+        #mask_idc = np.random.choice(self.max_range[mask_pos_okay],
+        #                            num_mask,
+        #                            replace=False)
+        #mask[mask_idc] = True
+        ## IMPORTANT!!! - start
+        #masked = copy.deepcopy(mask).tolist()
+        ## IMPORTANT!!! - end
 
         # debug - start - 2024-8-29
         tokenized_messages = ids.tolist()
-        return tokenized_messages, gt, masked
+        return tokenized_messages, gt, mask_pos_okay
         # debug - end
 
     def __call__(self, sample: Mapping[str, Any]) -> Mapping[str, Any]:
