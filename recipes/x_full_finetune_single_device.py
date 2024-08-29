@@ -408,7 +408,9 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
         torch.save(self._model.state_dict(), PATH)
         print('SAVE MODEL SUCCESS')
 
-    def _loss_step(self, batch: Dict[str, torch.Tensor]) -> torch.Tensor:
+    def _loss_step(self,
+                   batch: Dict[str, torch.Tensor],
+                   test: bool = False) -> torch.Tensor:
         # Both are shape [b, s]
         tokens, labels = batch["tokens"], batch["labels"]
         # Get the attention mask and position ids from the dataset if they
@@ -424,7 +426,8 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
         logits = logits.transpose(1, 2)
 
         # Compute loss
-        loss = self._cls_loss_fn(cls, gt_cls) + 1e-3 * self._loss_fn(logits, labels)
+        loss = self._cls_loss_fn(cls,
+                                 gt_cls) + 1e-3 * self._loss_fn(logits, labels)
         # free logits otherwise it peaks backward memory
         del logits, cls
         return loss
