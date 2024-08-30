@@ -436,7 +436,7 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
         loss = 1e-3 * self._loss_fn(logits, labels) + x
         # free logits otherwise it peaks backward memory
         del logits, cls
-        return loss
+        return loss, x
 
     def train(self) -> None:
         """
@@ -496,9 +496,9 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
                 batch = {k: v.to(self._device) for k, v in batch.items()}
                 num_tokens += batch["tokens"].numel()
 
-                loss = self._loss_step(batch)
+                loss, x = self._loss_step(batch)
                 loss = loss / self._gradient_accumulation_steps
-                running_loss += loss
+                running_loss += x.item()
                 loss.backward()
 
                 # Step with optimizer
@@ -509,7 +509,7 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
 
                     self.global_step += 1
 
-                    x = running_loss.item()
+                    x = running_loss / self._gradient_accumulation_steps
                     if ema_loss is None:
                         ema_loss = x
                     else:
