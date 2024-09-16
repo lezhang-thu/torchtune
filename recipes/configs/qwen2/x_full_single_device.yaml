@@ -25,6 +25,8 @@ dataset:
   _component_: torchtune.datasets.bio_dataset
 test_dataset:
   _component_: torchtune.datasets.test_bio_dataset
+val_dataset:
+  _component_: torchtune.datasets.val_bio_dataset
 seed: null
 shuffle: True
 
@@ -72,3 +74,4 @@ metric_logger:
 output_dir: biology-research/model-8-26
 log_every_n_steps: 1
 log_peak_memory_stats: False
+ensemble_directory: /home/ubuntu/lezhang.thu/biology-research/val-split/torchtune/biology-research/model-8-26/ensemble-cls-regularization

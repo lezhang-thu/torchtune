@@ -189,9 +189,12 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
             shuffle=cfg.shuffle,
             batch_size=cfg.batch_size,
         )
-        self._test_sampler, self._test_dataloader = self._setup_data(
+        self._test_dataloader = self._setup_val_test(
             cfg_dataset=cfg.test_dataset,
-            shuffle=False,
+            batch_size=cfg.batch_size,
+        )
+        self._val_dataloader = self._setup_val_test(
+            cfg_dataset=cfg.val_dataset,
             batch_size=cfg.batch_size,
         )
         self.ratio = (len(self._dataloader) + len(self._test_dataloader)) / len(
@@ -360,6 +363,34 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
             log.info("Optimizer is initialized.")
             return optimizer
 
+    def _setup_val_test(
+        self,
+        cfg_dataset: DictConfig,
+        batch_size: int,
+    ) -> DataLoader:
+        if isinstance(cfg_dataset, ListConfig):
+            datasets = [
+                config.instantiate(single_cfg_dataset, self._tokenizer)
+                for single_cfg_dataset in cfg_dataset
+            ]
+            ds = ConcatDataset(datasets=datasets)
+        else:
+            ds = config.instantiate(cfg_dataset, self._tokenizer)
+        dataloader = DataLoader(
+            dataset=ds,
+            batch_size=batch_size,
+            shuffle=False,
+            # debug
+            collate_fn=partial(
+                utils.padded_collate,
+                # debug
+                #padding_idx=self._tokenizer.pad_id,
+                padding_idx=0,
+                ignore_idx=self._loss_fn.ignore_index,
+            ),
+        )
+        return dataloader
+
     def _setup_data(
         self,
         cfg_dataset: DictConfig,
@@ -405,11 +436,11 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
 
         return sampler, dataloader
 
-    def save_checkpoint(self, epoch: int) -> None:
+    def save_checkpoint(self, epoch: str) -> None:
         print('Saving model...')
         os.makedirs(self._output_dir, exist_ok=True)
         PATH = os.path.join(self._output_dir,
-                            'biology-qwen2-epoch_{}.pt'.format(epoch))
+                            'biology-qwen2-{}.pt'.format(epoch))
         torch.save(self._model.state_dict(), PATH)
         print('SAVE MODEL SUCCESS')
 
@@ -433,7 +464,8 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
         # Compute loss
         #x = 0 if test else self.ratio * self._cls_loss_fn(cls, gt_cls)
         x = 0 if test else self._cls_loss_fn(cls, gt_cls)
-        loss = 1e-3 * self._loss_fn(logits, labels) + x
+        #loss = 1e-3 * self._loss_fn(logits, labels) + x
+        loss = x
         # free logits otherwise it peaks backward memory
         del logits, cls
         return loss, x
@@ -461,16 +493,13 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
         self._profiler.start()
         # debug
         print('self._model.training: {}'.format(self._model.training))
+        best_right = -1
+        best_PATH = None
         # self.epochs_run should be non-zero when we're resuming from a checkpoint
         for curr_epoch in range(self.epochs_run, self.total_epochs):
-            print('Epoch: {}'.format(curr_epoch))
-            # debug
-            if curr_epoch > 5:
-                #pass
-                self.evaluate()
+
             ## debug - start - 2024.8.29
             #print('Unsupervised learning over test data...')
-            #self._test_sampler.set_epoch(curr_epoch)
             #for idx, batch in enumerate(self._test_dataloader):
             #    batch = {k: v.to(self._device) for k, v in batch.items()}
             #    loss = self._loss_step(
@@ -514,7 +543,7 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
                         ema_loss = x
                     else:
                         ema_loss = ema_loss * 0.99 + 0.01 * x
-                    print('Loss: {:.4f}'.format(ema_loss))
+                    print('Loss: {:.4f}'.format(ema_loss), flush=True)
                     #pbar.update(1)
                     #pbar.set_description("{}|{}|Loss: {:.4f}".format(
                     #    curr_epoch + 1, self.global_step, ema_loss))
@@ -550,26 +579,37 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
                 # Note we are stepping each batch, which might not include optimizer step in the trace
                 # if the schedule cycle doesn't align with gradient accumulation.
                 self._profiler.step()
+            print('Epoch: {}'.format(curr_epoch))
+            # debug
+            if curr_epoch > 9:
+                #pass
+                x = self.evaluate(self._val_dataloader)
+                if x >= best_right:
+                    best_right = x
+                    print('best_right: {}'.format(best_right), flush=True)
+                    self.save_checkpoint(epoch=str(self.seed) + '-best')
+                    best_PATH = os.path.join(
+                        self._output_dir,
+                        'biology-qwen2-{}.pt'.format(str(self.seed) + '-best'))
 
             self.epochs_run += 1
             # debug
             #self.save_checkpoint(epoch=curr_epoch)
 
-        self.evaluate()
         # debug
-        #self.save_checkpoint(epoch=self.total_epochs)
-
+        self._model.load_state_dict(torch.load(best_PATH, weights_only=True),
+                                    strict=True)
+        self.evaluate(self._test_dataloader)
         self._profiler.stop()
 
     def cleanup(self) -> None:
         self._metric_logger.close()
 
     @torch.no_grad
-    def evaluate(self):
-        self._test_sampler.set_epoch(0)
+    def evaluate(self, dataloader):
         self._model.eval()
         right, wrong = 0, 0
-        for idx, batch in enumerate(self._test_dataloader):
+        for idx, batch in enumerate(dataloader):
             batch = {k: v.to(self._device) for k, v in batch.items()}
             _, cls = self._model(batch["gt"])
             if batch["cls_label"].item() == cls.argmax().item():
@@ -579,8 +619,64 @@ class FullFinetuneRecipeSingleDevice(FTRecipeInterface):
             #print("Right: {}, Wrong: {}".format(right, wrong))
         print('#' * 20, '- start')
         print("Right: {}, Wrong: {}".format(right, wrong))
-        print('#' * 20, '- end')
+        print('#' * 20, '- end', flush=True)
         self._model.train()
+        return right
+
+    @torch.no_grad
+    def ensemble(self, ensemble_directory):
+        import torch.nn.functional as F
+        import glob
+        import numpy as np
+        import os
+
+        # Set print precision to 4 decimal places
+        np.set_printoptions(precision=4)
+
+        def list_files_non_recursive(directory):
+            # Use * to match only files in the given directory (non-recursive)
+            file_paths = glob.glob(f"{directory}/*")
+
+            # Filter out any directories from the result, keeping only files
+            file_paths = [f for f in file_paths if os.path.isfile(f)]
+
+            return file_paths
+
+        files = list_files_non_recursive(ensemble_directory)
+        print('files: {}'.format(files))
+        dataloader = self._test_dataloader
+        #dataloader = self._val_dataloader
+        full_prob = []
+        for model_pth in files:
+            self._model.load_state_dict(torch.load(model_pth,
+                                                   weights_only=True),
+                                        strict=True)
+            self._model.eval()
+            this_prob = []
+            print('#' * 20)
+            print('{} starts...'.format(os.path.basename(model_pth)))
+            for idx, batch in enumerate(dataloader):
+                batch = {k: v.to(self._device) for k, v in batch.items()}
+                _, cls = self._model(batch["gt"])
+                prob = F.softmax(cls, -1).to(torch.float32).numpy(force=True)[0]
+                print('idx: {: >2}, prob: {}'.format(idx, prob), flush=True)
+                this_prob.append(prob)
+            full_prob.append(this_prob)
+        full_prob = np.asarray(full_prob)
+        print('full_prob.shape: {}'.format(full_prob.shape))
+        full_prob = np.mean(full_prob, axis=0)
+        print('full_prob.shape: {}'.format(full_prob.shape))
+
+        right, wrong = 0, 0
+        for idx, batch in enumerate(dataloader):
+            batch = {k: v.to(self._device) for k, v in batch.items()}
+            if batch["cls_label"].item() == full_prob[idx].argmax():
+                right += 1
+            else:
+                wrong += 1
+        print('#' * 20, '- start')
+        print("Right: {}, Wrong: {}".format(right, wrong))
+        print('#' * 20, '- end', flush=True)
 
 
 @config.parse
@@ -595,7 +691,10 @@ def recipe_main(cfg: DictConfig) -> None:
     config.log_config(recipe_name="FullFinetuneRecipeSingleDevice", cfg=cfg)
     recipe = FullFinetuneRecipeSingleDevice(cfg=cfg)
     recipe.setup(cfg=cfg)
-    recipe.train()
+    # debug
+    print('TEST ENSEMBLE results', flush=True)
+    recipe.ensemble(cfg.ensemble_directory)
+    #recipe.train()
     recipe.cleanup()
 
 

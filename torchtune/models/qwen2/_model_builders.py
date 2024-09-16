@@ -311,7 +311,7 @@ def qwen2_x() -> TiedEmbeddingTransformerDecoder:
         # ACGT_ACGT 16 + ['?_?', 'D_I', 'I_I', 'D_D'] 4 + [BOS] 1 + [CLS] 1
         vocab_size=16 + 4 + 1 + 1,
         #num_layers=24,
-        num_layers=4,
+        num_layers=1,
         num_heads=14,
         num_kv_heads=2,
         embed_dim=896,

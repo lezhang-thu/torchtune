@@ -75,3 +75,8 @@ test_bio_dataset = partial(
     source="./test-split",
     split="test",
 )
+val_bio_dataset = partial(
+    x_bio_dataset,
+    source="./val-split",
+    split="validation",
+)

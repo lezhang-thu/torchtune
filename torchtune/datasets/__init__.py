@@ -22,7 +22,9 @@ from torchtune.datasets._text_completion import (
     TextCompletionDataset,
 )
 from torchtune.datasets._wikitext import wikitext_dataset
-from torchtune.datasets._x_sft import bio_dataset, test_bio_dataset
+from torchtune.datasets._x_sft import (bio_dataset, 
+                                        test_bio_dataset,
+                                        val_bio_dataset)
 
 __all__ = [
     "alpaca_dataset",
